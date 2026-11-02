@@ -12,10 +12,12 @@ At or above 0.90 the clock is left unlocked.
 
 # (lowest compute fraction in the level, position from catalog min toward catalog max)
 # None means do not lock the clock.
+# 0.30 to 0.90 locks at three quarters of the span. On the A100 catalog
+# 210..1410 MHz that is 1110 MHz. The halfway step put this decode region
+# at 810 MHz. A search can replace this fixed position later.
 _LEVELS = (
     (0.90, None),
-    (0.60, 0.75),
-    (0.30, 0.50),
+    (0.30, 0.75),
 )
 _LOWEST = 1.0 / 3.0
 

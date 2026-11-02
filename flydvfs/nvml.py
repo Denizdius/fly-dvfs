@@ -81,6 +81,12 @@ class Nvml:
             POINTER(c_uint),
         ]
         self.lib.nvmlDeviceGetSupportedGraphicsClocks.restype = c_int
+        self.lib.nvmlDeviceSetGpuLockedClocks.argtypes = [c_void_p, c_uint, c_uint]
+        self.lib.nvmlDeviceSetGpuLockedClocks.restype = c_int
+        self.lib.nvmlDeviceResetGpuLockedClocks.argtypes = [c_void_p]
+        self.lib.nvmlDeviceResetGpuLockedClocks.restype = c_int
+        self.lib.nvmlDeviceGetPowerUsage.argtypes = [c_void_p, POINTER(c_uint)]
+        self.lib.nvmlDeviceGetPowerUsage.restype = c_int
         self._check(self.lib.nvmlInit_v2(), "nvmlInit_v2")
 
     def close(self) -> None:
@@ -161,6 +167,36 @@ class Nvml:
             )
 
         return self._clock_list(query)
+
+    def power_watts(self, index: int) -> float:
+        """Instantaneous board power from NVML, in watts."""
+        milliwatts = c_uint()
+        self._check(
+            self.lib.nvmlDeviceGetPowerUsage(self._handle(index), byref(milliwatts)),
+            "nvmlDeviceGetPowerUsage",
+        )
+        return milliwatts.value / 1000.0
+
+    def current_sm_mhz(self, index: int) -> int:
+        return self._current_clock(self._handle(index), NVML_CLOCK_SM)
+
+    def current_mem_mhz(self, index: int) -> int:
+        return self._current_clock(self._handle(index), NVML_CLOCK_MEM)
+
+    def lock_sm_clock(self, index: int, mhz: int) -> None:
+        """Hold the SM clock at one supported frequency."""
+        handle = self._handle(index)
+        self._check(
+            self.lib.nvmlDeviceSetGpuLockedClocks(handle, mhz, mhz),
+            "nvmlDeviceSetGpuLockedClocks",
+        )
+
+    def unlock_sm_clock(self, index: int) -> None:
+        """Remove an SM clock lock. A GPU that is already unlocked is left alone."""
+        handle = self._handle(index)
+        rc = self.lib.nvmlDeviceResetGpuLockedClocks(handle)
+        if rc not in (NVML_SUCCESS, 6):  # 6 = NVML_ERROR_NOT_FOUND
+            self._check(rc, "nvmlDeviceResetGpuLockedClocks")
 
     def read_device(self, index: int) -> DeviceClocks:
         handle = self._handle(index)

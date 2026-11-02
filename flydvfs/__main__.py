@@ -1,7 +1,8 @@
-"""Probe device clock bounds and map a compute-bound fraction onto them."""
+"""Probe clock bounds, or run an application under the live clock controller."""
 
 import argparse
 import sys
+from pathlib import Path
 
 from flydvfs.nvml import Nvml, NvmlError
 
@@ -25,16 +26,33 @@ def _print_device(device, compute_fraction: float | None) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Learn each GPU's SM clock range and map a compute-bound fraction into it."
+        description="Map a live compute-bound fraction onto this GPU's SM clocks."
     )
-    parser.add_argument("--gpu", type=int, default=None, help="Single GPU index. Default: all.")
+    parser.add_argument("--gpu", type=int, default=None, help="GPU index. Default with a command: 0. Default without one: every GPU.")
     parser.add_argument(
         "--compute-fraction",
         type=float,
         default=None,
-        help="0..1 compute-bound score. 0.90 and above leaves the SM clock uncapped.",
+        help="0..1 compute-bound score to print. 0.90 and above leaves the SM clock uncapped.",
     )
+    parser.add_argument("--delay", type=float, default=60, help="Seconds to leave the clock unlocked after the application starts.")
+    parser.add_argument("--cap-window", type=float, default=1, help="Seconds to hold a clock choice before reading again.")
+    parser.add_argument("--sample-ms", type=float, default=80, help="Hardware sample window in milliseconds.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="Directory for the 100 ms trace and figures.")
+    parser.add_argument("command", nargs=argparse.REMAINDER, help="Application to run. Put -- before its own flags.")
     args = parser.parse_args(argv)
+    command = [item for item in args.command if item != "--"]
+
+    if command:
+        from flydvfs.control import run_application
+
+        try:
+            return run_application(
+                command, 0 if args.gpu is None else args.gpu, args.delay, args.cap_window, args.sample_ms, args.output_dir,
+            )
+        except (NvmlError, RuntimeError, ValueError, OSError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
 
     try:
         with Nvml() as nvml:

@@ -42,8 +42,7 @@ A float32 GEMM and a memory copy were sampled about 20 times a second. The catal
 | Compute fraction | Lock |
 |---|---|
 | 0.90 and above | unlocked |
-| 0.60 to 0.90 | 2385 MHz, three quarters of the span |
-| 0.30 to 0.60 | 1665 MHz, halfway up |
+| 0.30 to 0.90 | 2385 MHz, three quarters of the span |
 | below 0.30 | 1170 MHz, one third of the way up |
 
 The catalog minimum is not a lock. Clocks are chosen and not yet applied.
