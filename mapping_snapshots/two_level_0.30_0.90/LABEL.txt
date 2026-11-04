@@ -1,0 +1,20 @@
+Name: two_level_0.30_0.90
+Saved: 2026-11-03
+Live file: flydvfs/mapping.py
+This snapshot is a copy of that file. The live mapping is unchanged.
+
+Bands, general fractions, position on each GPU's own SM catalog:
+  below 0.30          position 1/3     lock
+  0.30 up to 0.90     position 0.75    lock
+  0.90 and above      unlocked
+
+On the RTX 4070 Ti catalog 210–3150 MHz those locks are 1185 MHz and 2415 MHz.
+
+Campaign that used this mapping:
+  Qwen3.5-2B, 2026-11-03 12:12–15:53 UTC
+  Alpaca and LongBench, batches 128 and 256, output 500 and 2000
+  two baseline runs and two Fly DVFS runs
+  results: trial_results/baseline, trial_results/dvfs, flydvfs-results
+  exit log: trial_results/campaign_status.txt
+
+The batch 8/16/32/64 campaign uses this same mapping.

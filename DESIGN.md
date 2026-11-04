@@ -12,7 +12,7 @@ While an application runs, every control step does three things:
 2. Turn those two readings into one compute-bound fraction from 0 to 1.
 3. Map that fraction onto this GPU's own SM clock range, and keep the chosen clock until the next decision.
 
-A fraction at or above 0.90 leaves the clock unlocked. Lower fractions lock a lower clock. The same fraction is a different MHz on a different GPU, because the MHz come from that GPU's catalog span.
+A fraction at or above 0.80 leaves the clock unlocked. Lower fractions lock a lower clock. The same fraction is a different MHz on a different GPU, because the MHz come from that GPU's catalog span.
 
 The fraction is how close the GPU is to being limited by SM throughput rather than by DRAM. A kernel sitting on the memory roof is a low fraction and should be capped. A kernel sitting on the compute roof is a high fraction and should be left alone. Both pipes busy at once lands near the middle.
 
@@ -37,21 +37,27 @@ A float32 GEMM and a memory copy were sampled about 20 times a second. The catal
 | Memory copy | 2055–2370 MHz, median 2370 | median 9001 |
 | GEMM then copy | 1140–2370 MHz, median 1290 | held at 9001 |
 
-1140 MHz is about one third of the way up the catalog span. 2370 MHz is about three quarters of the way up. Those two fractions are the general rule. On this GPU the mapper snaps to:
+1140 MHz is about one third of the way up the catalog span. 2370 MHz is about three quarters of the way up. The first map used those two positions: unlocked at 0.90 and above, three quarters of the span from 0.30 to 0.90, and one third of the span below 0.30. On this laptop GPU that was 2385 MHz and 1170 MHz. That copy is kept in `mapping_snapshots/two_level_0.30_0.90`.
 
-| Compute fraction | Lock |
-|---|---|
-| 0.90 and above | unlocked |
-| 0.30 to 0.90 | 2385 MHz, three quarters of the span |
-| below 0.30 | 1170 MHz, one third of the way up |
+## Current map
 
-The catalog minimum is not a lock. Clocks are chosen and not yet applied.
+The live map cuts a fixed share off the top of whatever catalog the card reports. A higher compute fraction keeps more of the span.
+
+| Compute fraction | Cut of the span | Position |
+|---|---|---|
+| 0.80 and above | unlocked | — |
+| 0.70 to 0.80 | 10% | 0.90 |
+| 0.50 to 0.70 | 25% | 0.75 |
+| 0.30 to 0.50 | 50% | 0.50 |
+| below 0.30 | 70% | 0.30 |
+
+On a 210–1410 MHz catalog those locks are 1290, 1110, 810, and 570 MHz. On a 210–3150 MHz catalog they are 2856, 2415, 1680, and 1092 MHz before snapping to a supported clock. The catalog minimum is not a lock.
 
 ## Sampler
 
 The score has to come from hardware counters, not from NVML's coarse utilization. On this laptop, NVML's datacenter performance counters report the device as unsupported. The sampler to use on the 5090 is CUPTI PM sampling: periodic hardware samples, one pass, no kernel replay. The readings are SM throughput as a percent of peak, DRAM throughput as a percent of peak, and DRAM bytes over the window.
 
-CUPTI has to be initialized with a subscriber before the CUDA context exists. PM sampling is checked with `cuptiProfilerDeviceSupported`. WSL can refuse that API, which is why this laptop stops at the mapping rule. The 5090 run is where the same GEMM and memory copy should show a high fraction on the GEMM and a low fraction on the copy, and where the 1/3 and 3/4 span points are checked against the clocks that GPU actually holds.
+CUPTI has to be initialized with a subscriber before the CUDA context exists. PM sampling is checked with `cuptiProfilerDeviceSupported`. WSL can refuse that API, which is why this laptop stops at the mapping rule. The 5090 run is where the same GEMM and memory copy should show a high fraction on the GEMM and a low fraction on the copy, and where the span cuts are checked against the clocks that GPU actually holds.
 
 ## How a run works
 
@@ -66,11 +72,11 @@ python -m flydvfs ./the_real_llm_application --delay 60 --cap-window 1
 After the delay, the loop is:
 
 1. Read one 50–100 ms window and compute the fraction.
-2. Map it. At or above 0.90, leave the clock unlocked. Otherwise lock the level from the table.
+2. Map it. At or above 0.80, leave the clock unlocked. Otherwise lock the level from the table.
 3. Keep that choice for `--cap-window` seconds.
 4. Read again and choose the next clock from the new fraction.
 
-The end of a cap window does not unlock the GPU. The clock changes only because the new fraction maps somewhere else. Unlocking happens when the fraction is at or above 0.90.
+The end of a cap window does not unlock the GPU. The clock changes only because the new fraction maps somewhere else. Unlocking happens when the fraction is at or above 0.80.
 
 ## Why the hold stays short
 

@@ -1,0 +1,16 @@
+name: span_cuts_10_25_50_70
+saved: 2026-11-04
+
+fraction          cut of the span    position
+0.80 and above    unlocked           —
+0.70 to 0.80      10%                0.90
+0.50 to 0.70      25%                0.75
+0.30 to 0.50      50%                0.50
+below 0.30        70%                0.30
+
+4070 Ti catalog 210..3150 MHz, before snapping: 2856, 2415, 1680, 1092.
+A100 catalog 210..1410 MHz: 1290, 1110, 810, 570.
+
+The previous map remains in mapping_snapshots/two_level_0.30_0.90.
+This campaign writes trial_results/dvfs_span_cuts and flydvfs-results/span_cuts.
+Earlier baseline and DVFS results are left in place.

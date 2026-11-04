@@ -1,25 +1,30 @@
-"""Map a compute-bound fraction onto clocks a GPU actually holds.
+"""Map a compute fraction to a point on this GPU's catalog span.
 
-A GEMM and a memory pass on a laptop GPU never sat on the catalog minimum
-or the catalog maximum. While the GPU was busy, the SM clock stayed in a
-coarse window: about one third of the way up the catalog span at the low
-end, and about three quarters of the way up at the high end. Those two
-fractions are the general rule. Each GPU still uses its own catalog span,
-so the same level is a different MHz on a different card.
+The fraction is sm / (sm + dram). A higher value is a more compute-bound
+window. Each locked level is a cut down from the top of the catalog span,
+so the same level is a different MHz on another card.
 
-At or above 0.90 the clock is left unlocked.
+    fraction          cut of the span    position
+    0.80 and above    unlocked           —
+    0.70 to 0.80      10%                0.90
+    0.50 to 0.70      25%                0.75
+    0.30 to 0.50      50%                0.50
+    below 0.30        70%                0.30
+
+On a 210..3150 MHz catalog those locks fall at 2856, 2415, 1680 and 1092 MHz
+before snapping to a supported clock. On a 210..1410 MHz catalog they fall
+at 1290, 1110, 810 and 570 MHz.
 """
 
 # (lowest compute fraction in the level, position from catalog min toward catalog max)
-# None means do not lock the clock.
-# 0.30 to 0.90 locks at three quarters of the span. On the A100 catalog
-# 210..1410 MHz that is 1110 MHz. The halfway step put this decode region
-# at 810 MHz. A search can replace this fixed position later.
+# None means do not lock the clock. The first matching level wins.
 _LEVELS = (
-    (0.90, None),
-    (0.30, 0.75),
+    (0.80, None),
+    (0.70, 0.90),
+    (0.50, 0.75),
+    (0.30, 0.50),
 )
-_LOWEST = 1.0 / 3.0
+_LOWEST = 0.30
 
 
 def span_position(compute_fraction: float) -> float | None:
