@@ -1,0 +1,4 @@
+[submodule "TokenPowerBench"]
+	path = TokenPowerBench
+	url = https://github.com/Denizdius/TokenPowerBench
+	branch = feature/offline-dataset-vllm-cli

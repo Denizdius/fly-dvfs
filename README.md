@@ -4,6 +4,19 @@ Online GPU clock control from a live compute-bound fraction. This project is sep
 
 The controller reads a one-pass CUPTI window (SM active cycles, SM elapsed cycles, and DRAM bytes), turns that into a compute-bound fraction, and locks this GPU's SM clock. A fraction at or above 0.80 leaves the clock unlocked.
 
+Workloads come from the [TokenPowerBench](https://github.com/Denizdius/TokenPowerBench) submodule at `TokenPowerBench/`, on branch `feature/offline-dataset-vllm-cli`. A fresh clone needs that checkout:
+
+```bash
+git clone --recurse-submodules https://github.com/Denizdius/fly-dvfs
+```
+
+An existing checkout can fetch it, and can move it to the latest commit on that branch:
+
+```bash
+git submodule update --init
+git submodule update --remote TokenPowerBench
+```
+
 ```bash
 python -m flydvfs --delay 60 --cap-window 1 -- /data/fly-dvfs/TokenPowerBench/trial.sh
 ```
