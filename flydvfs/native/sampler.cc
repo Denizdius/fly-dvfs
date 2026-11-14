@@ -277,15 +277,15 @@ void stop_and_disable() {
 }
 
 void init_counter_image() {
-    if (g_counter_image.empty()) {
-        CUpti_PmSampling_GetCounterDataSize_Params data_size{CUpti_PmSampling_GetCounterDataSize_Params_STRUCT_SIZE};
-        data_size.pPmSamplingObject = g_sampler;
-        data_size.numMetrics = 3;
-        data_size.pMetricNames = kMetricNames;
-        data_size.maxSamples = 128;
-        check(cuptiPmSamplingGetCounterDataSize(&data_size), "cuptiPmSamplingGetCounterDataSize");
-        g_counter_image.resize(data_size.counterDataSize);
-    }
+    // The image belongs to the current PM sampling object. Reusing the previous
+    // session's image makes CounterDataImageInitialize return INVALID_OPERATION.
+    CUpti_PmSampling_GetCounterDataSize_Params data_size{CUpti_PmSampling_GetCounterDataSize_Params_STRUCT_SIZE};
+    data_size.pPmSamplingObject = g_sampler;
+    data_size.numMetrics = 3;
+    data_size.pMetricNames = kMetricNames;
+    data_size.maxSamples = 128;
+    check(cuptiPmSamplingGetCounterDataSize(&data_size), "cuptiPmSamplingGetCounterDataSize");
+    g_counter_image.assign(data_size.counterDataSize, 0);
     CUpti_PmSampling_CounterDataImage_Initialize_Params init_image{CUpti_PmSampling_CounterDataImage_Initialize_Params_STRUCT_SIZE};
     init_image.pPmSamplingObject = g_sampler;
     init_image.counterDataSize = g_counter_image.size();
@@ -330,22 +330,12 @@ void select_trigger() {
     check(apply_config(), "cuptiPmSamplingSetConfig");
 }
 
-long long session_ms() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::steady_clock::now() - g_session_start)
-        .count();
-}
-
 double session_seconds() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - g_session_start).count();
 }
 
 bool restart_session(const std::string& reason) {
-    long long ms = session_ms();
     uint64_t produced = g_session_samples;
-    write_restart(reason, ms, produced);
-    std::cerr << "[flydvfs] restart " << reason << " ms " << ms
-              << " session_samples " << produced << std::endl;
     if (produced == 0) {
         g_empty_restarts += 1;
         if (g_empty_restarts >= kEmptyRestartLimit) {
@@ -358,6 +348,7 @@ bool restart_session(const std::string& reason) {
     } else {
         g_empty_restarts = 0;
     }
+    auto started = std::chrono::steady_clock::now();
     try {
         stop_and_disable();
         enable_sampler();
@@ -365,6 +356,10 @@ bool restart_session(const std::string& reason) {
         init_counter_image();
         start_pm();
         begin_session();
+        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - started)
+                           .count();
+        write_restart(reason, ms, produced);
         return true;
     } catch (const std::exception& exc) {
         fail(std::string("restart failed: ") + exc.what());
