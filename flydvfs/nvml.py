@@ -12,6 +12,12 @@ NVML_ERROR_INSUFFICIENT_SIZE = 7
 NVML_CLOCK_SM = 1
 NVML_CLOCK_MEM = 2
 
+
+class UtilizationRates(ctypes.Structure):
+    """nvmlUtilization_t: GPU percent, then memory percent."""
+
+    _fields_ = [("gpu", c_uint), ("memory", c_uint)]
+
 _LIB_NAMES = ("libnvidia-ml.so.1", "libnvidia-ml.so")
 
 
@@ -87,6 +93,8 @@ class Nvml:
         self.lib.nvmlDeviceResetGpuLockedClocks.restype = c_int
         self.lib.nvmlDeviceGetPowerUsage.argtypes = [c_void_p, POINTER(c_uint)]
         self.lib.nvmlDeviceGetPowerUsage.restype = c_int
+        self.lib.nvmlDeviceGetUtilizationRates.argtypes = [c_void_p, POINTER(UtilizationRates)]
+        self.lib.nvmlDeviceGetUtilizationRates.restype = c_int
         self._check(self.lib.nvmlInit_v2(), "nvmlInit_v2")
 
     def close(self) -> None:
@@ -167,6 +175,15 @@ class Nvml:
             )
 
         return self._clock_list(query)
+
+    def gpu_utilization_percent(self, index: int) -> float:
+        """Instantaneous GPU utilization from NVML, in percent."""
+        rates = UtilizationRates()
+        self._check(
+            self.lib.nvmlDeviceGetUtilizationRates(self._handle(index), byref(rates)),
+            "nvmlDeviceGetUtilizationRates",
+        )
+        return float(rates.gpu)
 
     def power_watts(self, index: int) -> float:
         """Instantaneous board power from NVML, in watts."""

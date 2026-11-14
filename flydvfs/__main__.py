@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--delay", type=float, default=60, help="Seconds to leave the clock unlocked after the application starts.")
     parser.add_argument("--cap-window", type=float, default=1, help="Seconds to hold a clock choice before reading again.")
-    parser.add_argument("--sample-ms", type=float, default=80, help="Hardware sample window in milliseconds.")
+    parser.add_argument("--sample-ms", type=float, default=250, help="Hardware sample window in milliseconds.")
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory for the 100 ms trace and figures.")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="Application to run. Put -- before its own flags.")
     args = parser.parse_args(argv)
