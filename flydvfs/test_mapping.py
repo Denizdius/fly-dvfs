@@ -2,7 +2,7 @@
 
 import unittest
 
-from flydvfs.mapping import map_compute_fraction_to_sm_mhz, span_position
+from flydvfs.mapping import LevelHold, map_compute_fraction_to_sm_mhz, span_position
 
 
 class MappingTest(unittest.TestCase):
@@ -34,6 +34,38 @@ class MappingTest(unittest.TestCase):
         supported = [210, 900, 1410]
         self.assertEqual(map_compute_fraction_to_sm_mhz(0.60, 210, 1410, supported), 900)
         self.assertIsNone(map_compute_fraction_to_sm_mhz(0.85, 210, 1410, supported))
+
+
+class LevelHoldTest(unittest.TestCase):
+    def _enter_075(self) -> LevelHold:
+        hold = LevelHold()
+        self.assertIsNone(hold.update(0.60))
+        self.assertEqual(hold.update(0.60), 0.75)
+        return hold
+
+    def test_edge_oscillation_stays_at_075(self):
+        hold = self._enter_075()
+        for fraction in (0.49, 0.51, 0.49, 0.51):
+            self.assertEqual(hold.update(fraction), 0.75)
+
+    def test_clear_drop_needs_two_windows(self):
+        hold = self._enter_075()
+        self.assertEqual(hold.update(0.40), 0.75)
+        self.assertEqual(hold.update(0.40), 0.50)
+
+    def test_raise_to_090_needs_one_window_past_the_margin(self):
+        hold = self._enter_075()
+        self.assertEqual(hold.update(0.76), 0.90)
+
+    def test_unlock_needs_one_window_past_the_margin(self):
+        hold = self._enter_075()
+        self.assertIsNone(hold.update(0.86))
+
+    def test_reset_clears_the_held_level(self):
+        hold = self._enter_075()
+        hold.reset()
+        self.assertIsNone(hold.position)
+        self.assertIsNone(hold.update(0.60))
 
 
 if __name__ == "__main__":

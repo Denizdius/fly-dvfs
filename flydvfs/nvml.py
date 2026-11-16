@@ -201,10 +201,10 @@ class Nvml:
         return self._current_clock(self._handle(index), NVML_CLOCK_MEM)
 
     def lock_sm_clock(self, index: int, mhz: int) -> None:
-        """Hold the SM clock at one supported frequency."""
+        """Set an upper cap on the SM clock. The minimum stays open."""
         handle = self._handle(index)
         self._check(
-            self.lib.nvmlDeviceSetGpuLockedClocks(handle, mhz, mhz),
+            self.lib.nvmlDeviceSetGpuLockedClocks(handle, 0, mhz),
             "nvmlDeviceSetGpuLockedClocks",
         )
 

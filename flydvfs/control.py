@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from flydvfs.fraction import compute_fraction, dram_peak_bytes_per_s, window_throughputs
+from flydvfs.mapping import LevelHold, position_to_sm_mhz
 from flydvfs.nvml import Nvml, NvmlError
 from flydvfs.plot import plot_run, write_trace
 from flydvfs.validate import SampleValidator
@@ -272,7 +273,7 @@ def _describe(fraction: float | None, sm: float | None, dram: float | None, mhz:
         return "idle, clock unchanged"
     if mhz is None:
         return f"fraction {fraction:.2f}  sm {sm:.2f}  dram {dram:.2f}  -> unlock"
-    return f"fraction {fraction:.2f}  sm {sm:.2f}  dram {dram:.2f}  -> lock {mhz} MHz"
+    return f"fraction {fraction:.2f}  sm {sm:.2f}  dram {dram:.2f}  -> cap {mhz} MHz"
 
 
 def run_application(
@@ -321,6 +322,7 @@ def run_application(
         env["FLYDVFS_INTERVAL_CYCLES"] = str(interval_cycles)
         process = None
         locked: int | None = None
+        level_hold = LevelHold()
         seen = 0
         failsafe_unlocks = 0
         hold_until = time.perf_counter() + delay_s
@@ -340,6 +342,7 @@ def run_application(
                         else:
                             cap.set_lock(None)
                             locked = None
+                            level_hold.reset()
                             failsafe_unlocks += 1
                             print("[flydvfs] no valid window for 3 s, unlocked", flush=True)
                 if time.perf_counter() < hold_until:
@@ -364,9 +367,19 @@ def run_application(
                     continue
                 sm, dram = parts
                 fraction = compute_fraction(sm, dram)
-                target = None if fraction is None else device.target_sm_mhz(fraction)
+                if fraction is None:
+                    print("[flydvfs] " + _describe(fraction, sm, dram, None))
+                    hold_until = time.perf_counter() + cap_window_s
+                    continue
+                position = level_hold.update(fraction)
+                target = position_to_sm_mhz(
+                    position,
+                    device.sm_min_mhz,
+                    device.sm_max_mhz,
+                    device.supported_sm_mhz or None,
+                )
                 print("[flydvfs] " + _describe(fraction, sm, dram, target))
-                if fraction is not None and target != locked:
+                if target != locked:
                     with nvml_lock:
                         if target is None:
                             nvml.unlock_sm_clock(gpu)
